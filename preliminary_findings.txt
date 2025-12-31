@@ -1,0 +1,282 @@
+================================================================================
+PRELIMINARY FINDINGS: BE-FAIR SUBGROUP FAIRNESS ANALYSIS
+================================================================================
+Author: Manil Mehta
+Date: December 31, 2025
+Data Source: Gupta et al. (2025) JGIM, Table 2, Figures 1-2
+
+PURPOSE:
+To perform rapid subgroup fairness assessment by calculating relative 
+prediction errors across demographic groups, complementing the BE-FAIR paper's 
+calibration and discrimination analyses with interpretable percentage metrics.
+
+================================================================================
+KEY FINDINGS
+================================================================================
+
+FINDING 1: EXTREME OVER-PREDICTION FOR MULTI-RACIAL PATIENTS
+-----------------------------------------------------------------------------
+Outcome: Hospitalization
+Actual rate: 4.4%
+Predicted rate: 24.5%
+Relative error: +456.8%
+
+Clinical Implication:
+The model predicts multi-racial patients are 5.6x more likely to be 
+hospitalized than they actually are. This could lead to:
+- Unnecessary enrollment in care management programs
+- Wasted staff time on intensive outreach for patients at lower risk
+- Potential stigmatization of multi-racial individuals as "high utilizers"
+- Reduced resources available for truly high-risk patients
+
+Research Question for Dr. Gupta's Lab:
+Is this extreme miscalibration due to (a) small sample size (n=4,180, only 
+3.7% of cohort), (b) heterogeneity within the multi-racial category masking 
+important subgroup differences, or (c) systematic missing data for patients 
+who identify with multiple races? Would disaggregating this group or 
+incorporating additional demographic features improve calibration?
+
+
+FINDING 2: SYSTEMATIC OVER-PREDICTION IN MOST VULNERABLE COMMUNITIES
+-----------------------------------------------------------------------------
+Outcome: Hospitalization  
+Group: HPI 0-25% (lowest quartile, most socially vulnerable)
+Actual rate: 6.9%
+Predicted rate: 17.8%
+Relative error: +157.9%
+
+Clinical Implication:
+Patients living in the least healthy environments are over-predicted by 2.6x. 
+This suggests the model may conflate social vulnerability with healthcare 
+utilization risk. Consequences include:
+- Reinforcing stereotypes about low-income communities being "high-need"
+- Misallocating resources away from other vulnerable patients
+- Potential community distrust if residents perceive targeting as surveillance
+- Missing root causes (e.g., access barriers, transportation) that don't 
+  predict hospitalization in this population
+
+Research Question for Dr. Gupta's Lab:
+What specific social determinants are missing from the model that would 
+better differentiate between vulnerability and actual utilization? For example, 
+do HPI 0-25% patients have lower hospitalization rates because of access 
+barriers (can't get to hospital) rather than lower clinical need? Should we 
+incorporate features like transportation access, insurance stability, or 
+primary care engagement?
+
+
+FINDING 3: CONSISTENT PATTERN - ED UNDER-PREDICTION, HOSPITALIZATION OVER-PREDICTION
+-----------------------------------------------------------------------------
+Demographic groups: Black, Multi-racial, AAPI, Hispanic, Other
+
+Pattern observed:
+- ED visits: All minoritized groups show UNDER-prediction (-13% to -25% error)
+- Hospitalizations: Same groups show OVER-prediction (+44% to +457% error)
+
+Example (Black patients):
+- ED visits: Actual 5.2%, Predicted 4.5% → 13.5% under-prediction
+- Hospitalizations: Actual 8.9%, Predicted 12.9% → 44.9% over-prediction
+
+Clinical Implication:
+This bidirectional bias suggests the model systematically misunderstands 
+healthcare utilization patterns for minoritized populations. Possible causes:
+- Training data reflects access barriers (minoritized patients can't reach ED)
+- Model interprets "high-risk features" differently by race
+- Historical data includes discrimination in admission decisions
+- ED and hospitalization may not be causally linked in the way the model assumes
+
+Consequences:
+- Patients who need ED-level intervention may be missed (under-prediction)
+- Same patients flagged for hospitalization intervention they don't need (over)
+- Intervention strategies designed for predicted hospitalizations won't address 
+  actual ED utilization patterns
+
+Research Question for Dr. Gupta's Lab:
+Should ED visits and hospitalizations be modeled separately with different 
+feature sets? What historical biases in the EHR data (e.g., differential 
+admission thresholds by race) might explain this pattern? Could we use 
+temporal data to understand the ED → hospitalization pathway by demographic 
+group and adjust the model accordingly?
+
+
+FINDING 4: REFERENCE GROUP OPTIMIZATION
+-----------------------------------------------------------------------------
+Group: White/Caucasian (59.5% of cohort, n=68,061)
+Both outcomes: 0.0% prediction error (perfect calibration)
+
+Clinical Implication:
+The model appears implicitly optimized for the majority population, achieving 
+perfect calibration for White/Caucasian patients while showing 16-457% errors 
+for minoritized groups. This is the classic "algorithmic fairness" problem:
+
+- Default assumption that "one model fits all" favors dominant group
+- Minority groups treated as edge cases rather than distinct populations
+- Perpetuates health inequities even with well-intentioned deployment
+
+This finding validates the BE-FAIR framework's emphasis on disaggregated 
+evaluation but reveals that calibration metrics alone (log odds ratios, 
+p-values) may not make the magnitude of disparity obvious to implementers.
+
+Research Question for Dr. Gupta's Lab:
+Should we develop group-specific models or group-specific decision thresholds? 
+For example, rather than using 60% predicted risk across all groups, could we 
+calibrate thresholds to achieve similar positive predictive values (PPV) or 
+similar false positive rates across demographic groups? What are the ethical 
+and practical trade-offs of this approach?
+
+
+FINDING 5: SOCIAL VULNERABILITY GRADIENT IN PREDICTION ERROR
+-----------------------------------------------------------------------------
+Hospitalization errors by HPI quartile:
+- HPI 0-25% (most vulnerable): +157.9% over-prediction
+- HPI 25-50%: +174.5% over-prediction
+- HPI 50-75%: +18.4% over-prediction
+- HPI 75-100% (least vulnerable): +16.7% over-prediction
+
+Pattern: Prediction error decreases as social vulnerability decreases, 
+suggesting the model struggles most with patients facing multiple social 
+determinants of health challenges.
+
+Clinical Implication:
+The model performs well for patients in healthy environments (HPI 75-100%) 
+but increasingly fails as social vulnerability increases. This means:
+- Patients who most need equitable care are least accurately predicted
+- Current 60% risk threshold may be too low for high-HPI, too high for low-HPI
+- Risk of "double jeopardy": vulnerable patients face both worse health AND 
+  worse algorithmic treatment
+
+Research Question for Dr. Gupta's Lab:
+Can we incorporate additional SDOH features (housing stability, food security, 
+transportation access) to improve performance for low-HPI patients? Would 
+partnering with community organizations to collect non-EHR data (e.g., from 
+social service agencies) help capture missing context for vulnerable populations?
+
+
+================================================================================
+METHODOLOGICAL CONTRIBUTION
+================================================================================
+
+This analysis demonstrates that RELATIVE ERROR METRICS provide value beyond 
+the statistical measures in the BE-FAIR paper:
+
+Advantage 1 - INTERPRETABILITY
+"457% over-prediction" is immediately understandable to clinicians, 
+administrators, and community partners. "Log odds ratio of 0.245±0.087, 
+p=0.005" requires statistical expertise to interpret.
+
+Advantage 2 - PRIORITIZATION  
+Ranking groups by error magnitude (multi-racial > HPI 0-25% > Hispanic) 
+allows teams to triage mitigation efforts toward the most affected populations.
+
+Advantage 3 - RAPID SCREENING
+This 2-hour analysis using published summary statistics suggests a lightweight 
+bias monitoring protocol that could be applied to:
+- New models before deployment
+- Existing models as part of continuous monitoring (BE-FAIR Step 8)
+- Models at resource-limited institutions without dedicated ML teams
+
+Advantage 4 - STAKEHOLDER COMMUNICATION
+Bar charts with color-coded bias direction are more accessible than calibration 
+curves for engaging community partners, patient advisory boards, and clinical 
+staff in equity conversations.
+
+================================================================================
+LIMITATIONS & NEXT STEPS
+================================================================================
+
+LIMITATIONS OF THIS PRELIMINARY ANALYSIS:
+
+1. Used summary statistics from published paper rather than patient-level data
+   → Cannot perform statistical significance testing on relative errors
+   → Cannot examine intersectional identities (e.g., Black + low-HPI + female)
+
+2. Small sample sizes for some groups (AIAN n=415) limit interpretation
+   → 457% error for multi-racial may be partly driven by small n=4,180
+
+3. Extracted predicted probabilities from calibration intercepts
+   → Exact values may differ from individual patient predictions
+   → Cannot assess prediction variance within groups
+
+4. Binary outcomes (ED visit yes/no, hospitalization yes/no)
+   → Doesn't capture severity, length of stay, or downstream outcomes
+   → May miss clinically important differences in utilization patterns
+
+5. Cross-sectional analysis of one time period
+   → Cannot assess temporal trends or model drift
+   → Unknown if disparities persist, worsen, or improve over time
+
+
+PROPOSED NEXT STEPS WITH PATIENT-LEVEL DATA:
+
+Phase 1 (Winter Quarter) - VALIDATION
+1. Replicate this analysis with actual UC Davis Health dataset
+2. Add statistical testing: Are relative errors significantly different from 
+   zero? From the reference group?
+3. Intersectional analysis: Examine race × HPI × gender × age combinations
+4. Temporal analysis: Do disparities change over the 2-year study period?
+
+Phase 2 (Spring Quarter) - ROOT CAUSE INVESTIGATION  
+5. Feature importance analysis: Which model inputs drive miscalibration?
+6. Missing data patterns: Are errors correlated with incomplete records?
+7. Stakeholder interviews: Do care managers observe these patterns in practice?
+8. Community input: How do patients from high-error groups experience outreach?
+
+Phase 3 (Summer) - INTERVENTION DEVELOPMENT
+9. Test recalibration approaches (group-specific thresholds, weighted models)
+10. Develop automated bias monitoring dashboard for continuous surveillance
+11. Create implementation guidelines for other UC Davis Health models
+12. Expand to other outcomes (readmissions, no-shows, treatment adherence)
+
+================================================================================
+WHY THIS MATTERS FOR DR. GUPTA'S LAB
+================================================================================
+
+The BE-FAIR framework is groundbreaking, but implementation requires PRACTICAL 
+TOOLS that bridge the gap between statistical rigor and clinical action. This 
+analysis suggests three concrete additions:
+
+1. RAPID BIAS SCREENING PROTOCOL
+   Add relative error metrics to BE-FAIR Step 6 as a complement to calibration 
+   and discrimination. This makes disparities immediately visible to non-
+   statisticians and allows for quick "red flag" detection.
+
+2. DECISION SUPPORT FOR THRESHOLD SETTING
+   The 60% risk threshold works well for White/Caucasian patients but may need 
+   adjustment for other groups. Relative error analysis helps determine 
+   appropriate group-specific cutoffs to achieve equity in PPV or sensitivity.
+
+3. STAKEHOLDER ENGAGEMENT TOOL
+   Visualizations of relative errors in plain language facilitate the community 
+   engagement and transparency emphasized in BE-FAIR Steps 2, 7, and 8.
+
+This preliminary work demonstrates feasibility and value of these extensions, 
+positioning them for rigorous validation and implementation research.
+
+================================================================================
+CONCLUSION
+================================================================================
+
+Analysis using publicly available data revealed substantial and 
+actionable disparities:
+- 457% over-prediction for multi-racial patients
+- 158% over-prediction for most vulnerable communities  
+- Systematic under-prediction of ED visits for all minoritized groups
+- Perfect calibration for White/Caucasian reference group
+
+These findings validate BE-FAIR's emphasis on disaggregated evaluation while 
+suggesting that relative error metrics enhance interpretability and actionability.
+
+Next step: Validate with patient-level data and expand to develop practical 
+tools for health systems implementing equitable predictive models.
+
+================================================================================
+REFERENCES
+================================================================================
+
+Gupta R, Sasaki M, Taylor SL, et al. (2025). Developing and Applying the 
+BE-FAIR Equity Framework to a Population Health Predictive Model: A 
+Retrospective Observational Cohort Study. Journal of General Internal Medicine, 
+40(11), 2537-2547. https://doi.org/10.1007/s11606-025-09462-1
+
+================================================================================
+END OF DOCUMENT
+================================================================================
